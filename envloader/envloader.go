@@ -78,19 +78,25 @@ func loadEnv(files []string, cfg *config) bool {
 		return false
 	}
 
-	baseDir := cfg.baseDir
-	if baseDir == "" {
-		var err error
-		baseDir, err = os.Getwd()
-		if err != nil {
-			panic(fmt.Errorf("envloader: resolve working directory: %w", err))
-		}
-	}
-
+	var (
+		baseDir         string
+		baseDirResolved bool
+	)
 	var paths []string
 	for _, file := range files {
 		path := file
 		if !filepath.IsAbs(path) {
+			if !baseDirResolved {
+				baseDir = cfg.baseDir
+				if baseDir == "" {
+					var err error
+					baseDir, err = os.Getwd()
+					if err != nil {
+						panic(fmt.Errorf("envloader: resolve working directory: %w", err))
+					}
+				}
+				baseDirResolved = true
+			}
 			path = filepath.Join(baseDir, filepath.FromSlash(path))
 		}
 

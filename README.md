@@ -58,7 +58,7 @@ If `BUILD_WORKING_DIRECTORY` is empty, the loader falls back to the process work
 
 After loading at least one file, `MustLoadEnv` restarts the process with the updated environment by default. This ensures packages whose `init()` functions already ran see the loaded values. The process is re-executed with the same arguments and environment.
 
-Use `NoRestart()` under debuggers (exec detaches Delve or IDE debuggers), in tests, and on Windows. Automatic restart is not supported on Windows; calling `MustLoadEnv` without `NoRestart()` there panics and asks the caller to pass `NoRestart()`.
+Use `NoRestart()` under debuggers (exec detaches Delve or IDE debuggers), in tests, and on platforms without process execution. Automatic restart is not supported on Windows, js/wasm, wasip1/wasm, or other non-Unix platforms; calling `MustLoadEnv` without `NoRestart()` there panics and asks the caller to pass `NoRestart()`.
 
 Loaded files use `godotenv.Overload`, so values in the files override environment variables that were already set.
 

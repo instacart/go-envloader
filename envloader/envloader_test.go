@@ -161,4 +161,24 @@ func TestMustLoadEnv(t *testing.T) {
 
 		assert.False(t, load(t, nil, envloader.WithBaseDir(dir)))
 	})
+
+	t.Run("EmptyFileListDoesNotNeedWorkingDirectory", func(t *testing.T) {
+		dir := t.TempDir()
+		t.Chdir(dir)
+		require.NoError(t, os.Remove(dir))
+
+		assert.False(t, load(t, nil))
+	})
+
+	t.Run("AbsolutePathDoesNotNeedWorkingDirectory", func(t *testing.T) {
+		dir := setUpWorkingDir(t, map[string]string{"a.env": "TEST_A=1\n"})
+		t.Setenv("TEST_A", "")
+
+		removed := t.TempDir()
+		t.Chdir(removed)
+		require.NoError(t, os.Remove(removed))
+
+		assert.True(t, load(t, []string{filepath.Join(dir, "a.env")}))
+		assert.Equal(t, "1", os.Getenv("TEST_A"))
+	})
 }
