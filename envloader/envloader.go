@@ -114,13 +114,25 @@ func loadEnv(files []string, cfg *config) bool {
 	if len(paths) == 0 {
 		return false
 	}
+
+	// Resolve the executable before loading: on some platforms os.Executable
+	// consults PATH, and an env file can change PATH.
+	var executable string
+	if !cfg.noRestart {
+		var err error
+		executable, err = os.Executable()
+		if err != nil {
+			panic(fmt.Errorf("envloader: resolve executable: %w", err))
+		}
+	}
+
 	if err := godotenv.Overload(paths...); err != nil {
 		panic(err)
 	}
 	_ = os.Setenv("ENV_LOADER_LOADED_ENVS", "true")
 
 	if !cfg.noRestart {
-		restartProcess()
+		restartProcess(executable)
 	}
 	return true
 }
