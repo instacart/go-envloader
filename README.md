@@ -11,9 +11,6 @@ Loading `.env` files with `godotenv` directly updates the process environment, b
 they saw at startup. `envloader` works around that by loading the files and then restarting the
 process, so the restarted process starts with the loaded values before package initialization.
 
-Call `MustLoadEnv` as early as possible in the load order, usually within the first few lines of
-`main`, before constructing values that depend on the environment.
-
 ## Usage
 
 Add a thin wrapper in your service's internal `myappenvloader` package that lists the files it wants to load:
