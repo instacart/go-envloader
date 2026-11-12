@@ -2,6 +2,7 @@ package envloader
 
 import (
 	"errors"
+	"fmt"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -19,6 +20,8 @@ type Option func(*config)
 
 type config struct {
 	requireAll bool
+	noRestart  bool
+	baseDir    string
 }
 
 // RequireAll returns an Option that makes MustLoadEnv panic when any of the
@@ -29,13 +32,36 @@ func RequireAll() Option {
 	}
 }
 
+// WithBaseDir sets the directory that relative file paths are resolved against.
+// An empty directory, or no WithBaseDir option, uses the current working
+// directory. Absolute paths ignore the base directory.
+//
+// This makes it possible to write
+// WithBaseDir(os.Getenv("BUILD_WORKING_DIRECTORY")): an empty environment
+// variable falls back to the process working directory, while Bazel supplies
+// the directory the command was run from.
+func WithBaseDir(dir string) Option {
+	return func(c *config) {
+		c.baseDir = dir
+	}
+}
+
+// NoRestart disables the process restart after env files are loaded. Use it
+// when running under a debugger, in tests, or on Windows.
+func NoRestart() Option {
+	return func(c *config) {
+		c.noRestart = true
+	}
+}
+
 // MustLoadEnv loads the given env files. Relative paths resolve against
-// BUILD_WORKING_DIRECTORY when it is set (bazel run), and against the current
-// working directory otherwise. That variable is the directory the command was
-// invoked from rather than the workspace root, so the paths are relative to
-// where the user ran it. Files that do not exist are skipped unless
-// RequireAll is passed; any other error panics. Returns true if at least one
-// file was loaded.
+// WithBaseDir, or the current working directory when no base directory is set.
+// Files that do not exist are skipped unless RequireAll is passed; any other
+// error panics. Returns true if at least one file was loaded.
+//
+// After loading at least one file, MustLoadEnv restarts the process so packages
+// whose init functions already ran see the new environment. Pass NoRestart to
+// skip that restart.
 //
 // Loading is skipped once ENV_LOADER_LOADED_ENVS is "true", which the loader
 // sets itself so a restarted process does not load the files twice.
@@ -52,12 +78,20 @@ func loadEnv(files []string, cfg *config) bool {
 		return false
 	}
 
-	workingDirectory := os.Getenv("BUILD_WORKING_DIRECTORY")
+	baseDir := cfg.baseDir
+	if baseDir == "" {
+		var err error
+		baseDir, err = os.Getwd()
+		if err != nil {
+			panic(fmt.Errorf("envloader: resolve working directory: %w", err))
+		}
+	}
+
 	var paths []string
 	for _, file := range files {
 		path := file
-		if workingDirectory != "" && !filepath.IsAbs(path) {
-			path = filepath.Join(workingDirectory, filepath.FromSlash(path))
+		if !filepath.IsAbs(path) {
+			path = filepath.Join(baseDir, filepath.FromSlash(path))
 		}
 
 		_, err := os.Stat(path)
@@ -78,5 +112,9 @@ func loadEnv(files []string, cfg *config) bool {
 		panic(err)
 	}
 	_ = os.Setenv("ENV_LOADER_LOADED_ENVS", "true")
+
+	if !cfg.noRestart {
+		restartProcess()
+	}
 	return true
 }
