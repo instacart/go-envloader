@@ -4,6 +4,16 @@ Load `.env` files at startup and restart the process so `init()` functions see t
 
 Pre-1.0, maintained on a best-effort basis. See [Project status](#project-status).
 
+## Problem
+
+Loading `.env` files with `godotenv` directly updates the process environment, but packages whose
+`init()` functions or package-level variables were initialized before that point keep the values
+they saw at startup. `envloader` works around that by loading the files and then restarting the
+process, so the restarted process starts with the loaded values before package initialization.
+
+Call `MustLoadEnv` as early as possible in the load order, usually within the first few lines of
+`main`, before constructing values that depend on the environment.
+
 ## Usage
 
 Add a thin wrapper in your service's internal `myappenvloader` package that lists the files it wants to load:
@@ -22,7 +32,7 @@ func MustLoadEnv(extraFiles ...string) bool {
 }
 ```
 
-Call it at the very top of `main` — before anything else initializes — so that all packages see the loaded environment variables:
+Call it as early as possible in the load order, usually within the first few lines of `main` and before anything else initializes, so that all packages see the loaded environment variables:
 
 ```go
 func main() {
